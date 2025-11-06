@@ -10,22 +10,33 @@ FetchContent_Declare(
     GIT_REPOSITORY https://github.com/boostorg/boost.git
     GIT_TAG boost-1.86.0
 )
-FetchContent_MakeAvailable(boost)
+FetchContent_Declare(
+    cogoproject
+    GIT_REPOSITORY https://github.com/bitfactory-software/co_go.git
+    GIT_TAG main
+)
+
+FetchContent_MakeAvailable(boost cogoproject)
 
 project ("hello_asio")
 
 add_executable(chat_server chat_server.cpp)
 target_link_libraries(
   chat_server
-  PRIVATE #cogoproject::co_go
-          Boost::asio)
+  PRIVATE Boost::asio)
  set_property(TARGET chat_server PROPERTY CXX_STANDARD 23)
 
 add_executable(chat_client chat_client.cpp)
 target_link_libraries(
   chat_client
-  PRIVATE #cogoproject::co_go
-          Boost::asio)
+  PRIVATE Boost::asio)
   set_property(TARGET chat_client PROPERTY CXX_STANDARD 23)
+
+add_executable(co_go_chat_client co_go_chat_client.cpp)
+target_link_libraries(
+  co_go_chat_client
+  PRIVATE cogoproject::co_go
+          Boost::asio)
+  set_property(TARGET co_go_chat_client PROPERTY CXX_STANDARD 23)
 
 # TODO: Add tests and install targets if needed.
