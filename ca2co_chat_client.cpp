@@ -35,7 +35,9 @@ class chat_client {
     if (ec1) {
       co_return;
     }
+  }
 
+  ca2co::continuation<> read_loop() {
     while (true) {
       auto [ec2, read_length1] = co_await co_read_header();
       if (ec2 || !read_msg_.decode_header()) {
@@ -52,7 +54,7 @@ class chat_client {
     }
   }
 
-  void write(chat_message msg_) {
+  void post_write(chat_message msg_) {
     boost::asio::post(io_context_, [=]() {
       ca2co::spawn([=] -> ca2co::continuation<> {
         auto msg = msg_;
@@ -62,15 +64,15 @@ class chat_client {
         client->write_msgs_.push_back(msg);
         if (write_in_progress) co_return;
 
-        do{
-            auto [ec1, read_length1] = co_await client->co_write();
-            if (ec1) {
-              client->socket_.close();
-              co_return;
-            }
+        do {
+          auto [ec1, read_length1] = co_await client->co_write();
+          if (ec1) {
+            client->socket_.close();
+            co_return;
+          }
 
-            client->write_msgs_.pop_front();
-        } while(!client->write_msgs_.empty());
+          client->write_msgs_.pop_front();
+        } while (!client->write_msgs_.empty());
       }());
     });
   }
@@ -132,23 +134,6 @@ class chat_client {
         });
   }
 
-  void do_write() {
-    boost::asio::async_write(
-        socket_,
-        boost::asio::buffer(write_msgs_.front().data(),
-                            write_msgs_.front().length()),
-        [this](boost::system::error_code ec, std::size_t /*length*/) {
-          if (!ec) {
-            write_msgs_.pop_front();
-            if (!write_msgs_.empty()) {
-              do_write();
-            }
-          } else {
-            socket_.close();
-          }
-        });
-  }
-
  private:
   boost::asio::io_context& io_context_;
   tcp::socket socket_;
@@ -169,8 +154,10 @@ int main(int argc, char* argv[]) {
     // auto endpoints = resolver.resolve(argv[1], argv[2]);
     auto endpoints = resolver.resolve("localhost", "4400");
     chat_client c(io_context);
-    ca2co::spawn(
-        [&] -> ca2co::continuation<> { co_await c.connect(endpoints); }());
+    ca2co::spawn([&] -> ca2co::continuation<> {
+      co_await c.connect(endpoints);
+      co_await c.read_loop();
+    }());
 
     std::thread t([&io_context]() { io_context.run(); });
 
@@ -180,7 +167,7 @@ int main(int argc, char* argv[]) {
       msg.body_length(std::strlen(line));
       std::memcpy(msg.body(), line, msg.body_length());
       msg.encode_header();
-      c.write(msg);
+      c.post_write(msg);
     }
 
     c.close();
