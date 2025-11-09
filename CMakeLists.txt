@@ -3,6 +3,7 @@
 #
 cmake_minimum_required (VERSION 3.31)
 
+set(CMAKE_FOLDER __3rdParty)
 
  include(FetchContent)
 FetchContent_Declare(
@@ -10,15 +11,18 @@ FetchContent_Declare(
     GIT_REPOSITORY https://github.com/boostorg/boost.git
     GIT_TAG boost-1.86.0
 )
+FetchContent_MakeAvailable(boost)
+
+unset(CMAKE_FOLDER)
+
 FetchContent_Declare(
     cogoproject
     GIT_REPOSITORY https://github.com/bitfactory-software/ca2co.git
     GIT_TAG main
 )
-
 FetchContent_MakeAvailable(boost cogoproject)
 
-project ("hello_asio")
+project (asio_ca2co)
 
 add_executable(chat_server chat_server.cpp)
 target_link_libraries(
