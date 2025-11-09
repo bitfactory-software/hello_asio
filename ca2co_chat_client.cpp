@@ -26,21 +26,52 @@ typedef std::deque<chat_message> chat_message_queue;
 
 class chat_client {
  public:
+  ~chat_client() { assert(false); }
   chat_client(boost::asio::io_context& io_context)
       : io_context_(io_context), socket_(io_context) {}
 
   ca2co::continuation<> connect(const tcp::resolver::results_type& endpoints) {
-    auto co_connect_result = co_await co_connect(endpoints);
-    do_read_header();
+    auto [ec1, ep] = co_await co_connect(endpoints);
+    if (ec1) {
+      co_return;
+    }
+
+    while (true) {
+      auto [ec2, read_length1] = co_await co_read_header();
+      if (ec2 || !read_msg_.decode_header()) {
+        socket_.close();
+        co_return;
+      }
+      auto [ec3, read_length2] = co_await co_read_body();
+      if (ec3) {
+        socket_.close();
+        co_return;
+      }
+      std::cout.write(read_msg_.body(), read_msg_.body_length());
+      std::cout << "\n";
+    }
   }
 
-  void write(const chat_message& msg) {
-    boost::asio::post(io_context_, [this, msg]() {
-      bool write_in_progress = !write_msgs_.empty();
-      write_msgs_.push_back(msg);
-      if (!write_in_progress) {
-        do_write();
-      }
+  void write(chat_message msg_) {
+    boost::asio::post(io_context_, [=]() {
+      ca2co::spawn([=] -> ca2co::continuation<> {
+        auto msg = msg_;
+        auto client = this;
+
+        bool write_in_progress = !client->write_msgs_.empty();
+        client->write_msgs_.push_back(msg);
+        if (write_in_progress) co_return;
+
+        do{
+            auto [ec1, read_length1] = co_await client->co_write();
+            if (ec1) {
+              client->socket_.close();
+              co_return;
+            }
+
+            client->write_msgs_.pop_front();
+        } while(!client->write_msgs_.empty());
+      }());
     });
   }
 
@@ -48,47 +79,56 @@ class chat_client {
     boost::asio::post(io_context_, [this]() { socket_.close(); });
   }
 
- private:
-  struct co_connect_result {
-    boost::system::error_code ec;
-    tcp::endpoint ep;
-  };
-  ca2co::continuation<co_connect_result> co_connect(
+  ca2co::continuation<boost::system::error_code, tcp::endpoint> co_connect(
       const tcp::resolver::results_type& endpoints) {
-    co_return co_await ca2co::await_callback_async<co_connect_result>(
-        [&](std::function<void(co_connect_result)> const& handler) noexcept {
+    return ca2co::callback_async<boost::system::error_code, tcp::endpoint>(
+        [&](std::function<void(boost::system::error_code, tcp::endpoint)> const&
+                handler) noexcept {
           boost::asio::async_connect(
               socket_, endpoints,
               [handler](boost::system::error_code ec, tcp::endpoint ep) {
-                handler(co_connect_result{ec, ep});
+                handler(ec, ep);
               });
         });
   }
 
-  void do_read_header() {
-    boost::asio::async_read(
-        socket_,
-        boost::asio::buffer(read_msg_.data(), chat_message::header_length),
-        [this](boost::system::error_code ec, std::size_t /*length*/) {
-          if (!ec && read_msg_.decode_header()) {
-            do_read_body();
-          } else {
-            socket_.close();
-          }
+  ca2co::continuation<boost::system::error_code, size_t> co_read_header() {
+    return ca2co::callback_async<boost::system::error_code, size_t>(
+        [&](std::function<void(boost::system::error_code, size_t)> const&
+                handler) noexcept {
+          boost::asio::async_read(
+              socket_,
+              boost::asio::buffer(read_msg_.data(),
+                                  chat_message::header_length),
+              [handler](boost::system::error_code ec, std::size_t length) {
+                handler(ec, length);
+              });
         });
   }
 
-  void do_read_body() {
-    boost::asio::async_read(
-        socket_, boost::asio::buffer(read_msg_.body(), read_msg_.body_length()),
-        [this](boost::system::error_code ec, std::size_t /*length*/) {
-          if (!ec) {
-            std::cout.write(read_msg_.body(), read_msg_.body_length());
-            std::cout << "\n";
-            do_read_header();
-          } else {
-            socket_.close();
-          }
+  ca2co::continuation<boost::system::error_code, size_t> co_read_body() {
+    return ca2co::callback_async<boost::system::error_code, size_t>(
+        [&](std::function<void(boost::system::error_code, size_t)> const&
+                handler) noexcept {
+          boost::asio::async_read(
+              socket_,
+              boost::asio::buffer(read_msg_.body(), read_msg_.body_length()),
+              [handler](boost::system::error_code ec, std::size_t length) {
+                handler(ec, length);
+              });
+        });
+  }
+
+  ca2co::continuation<boost::system::error_code, size_t> co_write() {
+    return ca2co::callback_async<boost::system::error_code, size_t>(
+        [&](std::function<void(boost::system::error_code, size_t)> const&
+                handler) noexcept {
+          boost::asio::async_write(
+              socket_,
+              boost::asio::buffer(write_msgs_.front().data(),
+                                  write_msgs_.front().length()),
+              [handler, this](boost::system::error_code ec,
+                              std::size_t length) { handler(ec, length); });
         });
   }
 
@@ -118,18 +158,18 @@ class chat_client {
 
 int main(int argc, char* argv[]) {
   try {
-    //if (argc != 3) {
-    //  std::cerr << "Usage: chat_client <host> <port>\n";
-    //  return 1;
-    //}
+    // if (argc != 3) {
+    //   std::cerr << "Usage: chat_client <host> <port>\n";
+    //   return 1;
+    // }
 
     boost::asio::io_context io_context;
 
     tcp::resolver resolver(io_context);
-     //auto endpoints = resolver.resolve(argv[1], argv[2]);
+    // auto endpoints = resolver.resolve(argv[1], argv[2]);
     auto endpoints = resolver.resolve("localhost", "4400");
     chat_client c(io_context);
-    ca2co::dont_await(
+    ca2co::spawn(
         [&] -> ca2co::continuation<> { co_await c.connect(endpoints); }());
 
     std::thread t([&io_context]() { io_context.run(); });

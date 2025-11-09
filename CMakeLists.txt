@@ -35,7 +35,7 @@ target_link_libraries(
 add_executable(ca2co_chat_client ca2co_chat_client.cpp)
 target_link_libraries(
   ca2co_chat_client
-  PRIVATE cogoproject::ca2co
+  PRIVATE ca2co::ca2co
           Boost::asio)
   set_property(TARGET ca2co_chat_client PROPERTY CXX_STANDARD 23)
 

@@ -167,21 +167,21 @@ class chat_server {
 
 int main(int argc, char* argv[]) {
   try {
-    if (argc < 2) {
-      std::cerr << "Usage: chat_server <port> [<port> ...]\n";
-      return 1;
-    }
+    //if (argc < 2) {
+    //  std::cerr << "Usage: chat_server <port> [<port> ...]\n";
+    //  return 1;
+    //}
 
     boost::asio::io_context io_context;
 
     std::list<chat_server> servers;
-    for (int i = 1; i < argc; ++i) {
+//    for (int i = 1; i < argc; ++i) {
 #pragma warning(push)
 #pragma warning(disable : 4244 4242)
-      tcp::endpoint endpoint(tcp::v4(), std::atoi(argv[i]));
+      tcp::endpoint endpoint(tcp::v4(), 4400);//std::atoi(argv[i]));
 #pragma warning(pop)
       servers.emplace_back(io_context, endpoint);
-    }
+//    }
 
     io_context.run();
   } catch (std::exception& e) {
