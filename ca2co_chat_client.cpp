@@ -16,7 +16,7 @@
 #pragma warning(disable : 4242)
 #include <boost/asio.hpp>
 #pragma warning(pop)
-#include <co_go/continuation.hpp>
+#include <ca2co/continuation.hpp>
 
 #include "chat_message.hpp"
 
@@ -29,7 +29,7 @@ class chat_client {
   chat_client(boost::asio::io_context& io_context)
       : io_context_(io_context), socket_(io_context) {}
 
-  co_go::continuation<> connect(const tcp::resolver::results_type& endpoints) {
+  ca2co::continuation<> connect(const tcp::resolver::results_type& endpoints) {
     auto co_connect_result = co_await co_connect(endpoints);
     do_read_header();
   }
@@ -53,9 +53,9 @@ class chat_client {
     boost::system::error_code ec;
     tcp::endpoint ep;
   };
-  co_go::continuation<co_connect_result> co_connect(
+  ca2co::continuation<co_connect_result> co_connect(
       const tcp::resolver::results_type& endpoints) {
-    co_return co_await co_go::await_callback_async<co_connect_result>(
+    co_return co_await ca2co::await_callback_async<co_connect_result>(
         [&](std::function<void(co_connect_result)> const& handler) noexcept {
           boost::asio::async_connect(
               socket_, endpoints,
@@ -129,8 +129,8 @@ int main(int argc, char* argv[]) {
      //auto endpoints = resolver.resolve(argv[1], argv[2]);
     auto endpoints = resolver.resolve("localhost", "4400");
     chat_client c(io_context);
-    co_go::dont_await(
-        [&] -> co_go::continuation<> { co_await c.connect(endpoints); }());
+    ca2co::dont_await(
+        [&] -> ca2co::continuation<> { co_await c.connect(endpoints); }());
 
     std::thread t([&io_context]() { io_context.run(); });
 

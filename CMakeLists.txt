@@ -12,7 +12,7 @@ FetchContent_Declare(
 )
 FetchContent_Declare(
     cogoproject
-    GIT_REPOSITORY https://github.com/bitfactory-software/co_go.git
+    GIT_REPOSITORY https://github.com/bitfactory-software/ca2co.git
     GIT_TAG main
 )
 
@@ -32,11 +32,11 @@ target_link_libraries(
   PRIVATE Boost::asio)
   set_property(TARGET chat_client PROPERTY CXX_STANDARD 23)
 
-add_executable(co_go_chat_client co_go_chat_client.cpp)
+add_executable(ca2co_chat_client ca2co_chat_client.cpp)
 target_link_libraries(
-  co_go_chat_client
-  PRIVATE cogoproject::co_go
+  ca2co_chat_client
+  PRIVATE cogoproject::ca2co
           Boost::asio)
-  set_property(TARGET co_go_chat_client PROPERTY CXX_STANDARD 23)
+  set_property(TARGET ca2co_chat_client PROPERTY CXX_STANDARD 23)
 
 # TODO: Add tests and install targets if needed.
