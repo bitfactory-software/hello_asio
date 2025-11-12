@@ -1,7 +1,4 @@
-﻿# CMakeList.txt : CMake project for hello_asio, include source and define
-# project specific logic here.
-#
-cmake_minimum_required (VERSION 3.31)
+﻿cmake_minimum_required (VERSION 3.31)
 
 set(CMAKE_FOLDER __3rdParty)
 
@@ -42,5 +39,3 @@ target_link_libraries(
   PRIVATE ca2co::ca2co
           Boost::asio)
   set_property(TARGET ca2co_chat_client PROPERTY CXX_STANDARD 23)
-
-# TODO: Add tests and install targets if needed.
